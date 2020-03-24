@@ -554,7 +554,7 @@ create_compression_table(Oid owner, CompressColInfo *compress_cols)
 	toast_options =
 		transformRelOptions((Datum) 0, create->options, "toast", validnsps, true, false);
 	(void) heap_reloptions(RELKIND_TOASTVALUE, toast_options, true);
-	NewRelationCreateToastTable(compress_relid, toast_options);
+	NewRelationCreateToastTable(compress_relid, toast_options, false, false);
 	ts_catalog_restore_user(&sec_ctx);
 	modify_compressed_toast_table_storage(compress_cols, compress_relid);
 	ts_hypertable_create_compressed(compress_relid, compress_hypertable_id);

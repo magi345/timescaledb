@@ -352,14 +352,29 @@ chunk_append_exec(CustomScanState *node)
 		state->choose_next_subplan(state);
 
 #if PG96
-	if (node->ss.ps.ps_TupFromTlist)
+	if (IsA(node->ss.ps.plan, AggState))
 	{
-		resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+		if (((AggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
 
-		if (isDone == ExprMultipleResult)
-			return resultslot;
+			if (isDone == ExprMultipleResult)
+				return resultslot;
 
-		node->ss.ps.ps_TupFromTlist = false;
+			((AggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
+	}
+	else if (IsA(node->ss.ps.plan, WindowAggState))
+	{
+		if (((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+
+			if (isDone == ExprMultipleResult)
+				return resultslot;
+
+			((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
 	}
 #endif
 
@@ -398,7 +413,11 @@ chunk_append_exec(CustomScanState *node)
 
 			if (isDone != ExprEndResult)
 			{
-				node->ss.ps.ps_TupFromTlist = (isDone == ExprMultipleResult);
+				if (IsA(node->ss.ps.plan, AggState))
+					((AggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+				else if (IsA(node->ss.ps.plan, WindowAggState))
+					((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+
 				return resultslot;
 			}
 #else
@@ -741,7 +760,8 @@ constify_param_mutator(Node *node, void *context)
 			if (prm.execPlan != NULL)
 			{
 				ExprContext *econtext = GetPerTupleExprContext(estate);
-				ExecSetParamPlan(prm.execPlan, econtext);
+				/* GP_TIMESCALEDB_FIXME: is it proper to use NULL for QueryDesc? */
+				ExecSetParamPlan(prm.execPlan, econtext, NULL);
 			}
 
 			if (prm.execPlan == NULL)

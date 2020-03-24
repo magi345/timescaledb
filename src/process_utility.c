@@ -1075,7 +1075,7 @@ reindex_chunk(Hypertable *ht, Oid chunk_relid, void *arg)
 		case REINDEX_OBJECT_TABLE:
 			stmt->relation->relname = NameStr(chunk->fd.table_name);
 			stmt->relation->schemaname = NameStr(chunk->fd.schema_name);
-			ReindexTable(stmt->relation, stmt->options);
+			ReindexTable(stmt);
 			break;
 		case REINDEX_OBJECT_INDEX:
 			/* Not supported, a.t.m. See note in process_reindex(). */
@@ -2098,7 +2098,7 @@ process_cluster_start(ProcessUtilityArgs *args)
 			 * Since we keep OIDs between transactions, there is a potential
 			 * issue if an OID gets reassigned between two subtransactions
 			 */
-			cluster_rel(cim->chunkoid, cim->indexoid, true, stmt->verbose);
+			cluster_rel(cim->chunkoid, cim->indexoid, true, stmt->verbose, true);
 			PopActiveSnapshot();
 			CommitTransactionCommand();
 		}
@@ -2731,6 +2731,7 @@ process_altertable_end_subcmd(Hypertable *ht, Node *parsetree, ObjectAddress *ob
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("operation not supported on hypertables %d", cmd->subtype)));
 			break;
+		/* GP_TIMESCALEDB_FIXME: handle gpdb specific alter opterations */
 	}
 }
 

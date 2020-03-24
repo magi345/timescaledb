@@ -69,18 +69,18 @@ extern void timescale_reorder_rel(Oid tableOid, Oid indexOid, bool verbose, Oid 
 
 static void timescale_rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose, Oid wait_id,
 									   Oid destination_tablespace, Oid index_tablespace);
-static void copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
+static void tsl_copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 						   bool *pSwapToastByContent, TransactionId *pFreezeXid,
 						   MultiXactId *pCutoffMulti);
 
-static void reform_and_rewrite_tuple(HeapTuple tuple, TupleDesc oldTupDesc, TupleDesc newTupDesc,
+static void tsl_reform_and_rewrite_tuple(HeapTuple tuple, TupleDesc oldTupDesc, TupleDesc newTupDesc,
 									 Datum *values, bool *isnull, RewriteState rwstate);
 
-static void finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids,
+static void tsl_finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids,
 							  List *new_index_oids, bool swap_toast_by_content, bool is_internal,
 							  TransactionId frozenXid, MultiXactId cutoffMulti, Oid wait_id);
 
-static void swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal,
+static void tsl_swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal,
 								TransactionId frozenXid, MultiXactId cutoffMulti);
 
 static bool chunk_get_reorder_index(Hypertable *ht, Chunk *chunk, Oid index_relid,
@@ -93,7 +93,7 @@ tsl_reorder_chunk(PG_FUNCTION_ARGS)
 	Oid index_id = PG_ARGISNULL(1) ? InvalidOid : PG_GETARG_OID(1);
 	bool verbose = PG_ARGISNULL(2) ? false : PG_GETARG_BOOL(2);
 
-	/* used for debugging purposes only see finish_heap_swaps */
+	/* used for debugging purposes only see tsl_finish_heap_swaps */
 	Oid wait_id = PG_NARGS() < 4 || PG_ARGISNULL(3) ? InvalidOid : PG_GETARG_OID(3);
 
 	license_print_expiration_warning_if_needed();
@@ -119,7 +119,7 @@ tsl_move_chunk(PG_FUNCTION_ARGS)
 	Oid index_id = PG_ARGISNULL(3) ? InvalidOid : PG_GETARG_OID(3);
 	bool verbose = PG_ARGISNULL(4) ? false : PG_GETARG_BOOL(4);
 
-	/* used for debugging purposes only see finish_heap_swaps */
+	/* used for debugging purposes only see tsl_finish_heap_swaps */
 	Oid wait_id = PG_NARGS() < 6 || PG_ARGISNULL(5) ? InvalidOid : PG_GETARG_OID(5);
 
 	license_print_expiration_warning_if_needed();
@@ -326,7 +326,7 @@ timescale_reorder_rel(Oid tableOid, Oid indexOid, bool verbose, Oid wait_id,
 	 * case, since cluster() already did it.)  The index lock is taken inside
 	 * check_index_is_clusterable.
 	 */
-	OldHeap = try_relation_open(tableOid, ExclusiveLock);
+	OldHeap = try_relation_open(tableOid, ExclusiveLock, false);
 
 	/* If the table has gone away, we can skip processing it */
 	if (!OldHeap)
@@ -456,10 +456,10 @@ timescale_rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose, Oid wai
 	heap_close(OldHeap, NoLock);
 
 	/* Create the transient table that will receive the re-ordered data */
-	OIDNewHeap = make_new_heap(tableOid, tableSpace, relpersistence, ExclusiveLock);
+	OIDNewHeap = make_new_heap(tableOid, tableSpace, relpersistence, ExclusiveLock, true, false);
 
 	/* Copy the heap data into the new table in the desired order */
-	copy_heap_data(OIDNewHeap,
+	tsl_copy_heap_data(OIDNewHeap,
 				   tableOid,
 				   indexOid,
 				   verbose,
@@ -475,7 +475,7 @@ timescale_rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose, Oid wai
 	 * Swap the physical files of the target and transient tables, then
 	 * rebuild the target's indexes and throw away the transient table.
 	 */
-	finish_heap_swaps(tableOid,
+	tsl_finish_heap_swaps(tableOid,
 					  OIDNewHeap,
 					  old_index_oids,
 					  new_index_oids,
@@ -495,7 +495,7 @@ timescale_rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose, Oid wai
  * *pCutoffMulti receives the MultiXactId used as a cutoff point.
  */
 static void
-copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
+tsl_copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 			   bool *pSwapToastByContent, TransactionId *pFreezeXid, MultiXactId *pCutoffMulti)
 {
 	Relation NewHeap, OldHeap, OldIndex;
@@ -736,7 +736,7 @@ copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 
 		LockBuffer(buf, BUFFER_LOCK_SHARE);
 
-		switch (HeapTupleSatisfiesVacuum(tuple, OldestXmin, buf))
+		switch (HeapTupleSatisfiesVacuum(OldHeap, tuple, OldestXmin, buf))
 		{
 			case HEAPTUPLE_DEAD:
 				/* Definitely dead */
@@ -798,7 +798,7 @@ copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 		if (tuplesort != NULL)
 			tuplesort_putheaptuple(tuplesort, tuple);
 		else
-			reform_and_rewrite_tuple(tuple, oldTupDesc, newTupDesc, values, isnull, rwstate);
+			tsl_reform_and_rewrite_tuple(tuple, oldTupDesc, newTupDesc, values, isnull, rwstate);
 	}
 
 	if (indexScan != NULL)
@@ -833,7 +833,7 @@ copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 			if (tuple == NULL)
 				break;
 
-			reform_and_rewrite_tuple(tuple, oldTupDesc, newTupDesc, values, isnull, rwstate);
+			tsl_reform_and_rewrite_tuple(tuple, oldTupDesc, newTupDesc, values, isnull, rwstate);
 #if PG96
 			if (should_free)
 				pfree(tuple);
@@ -883,7 +883,7 @@ copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 	relform->relpages = num_pages;
 	relform->reltuples = num_tuples;
 
-	/* Don't update the stats for pg_class.  See swap_relation_files. */
+	/* Don't update the stats for pg_class.  See tsl_swap_relation_files. */
 	Assert(OIDOldHeap != RelationRelationId);
 	CacheInvalidateRelcacheByTuple(reltup);
 
@@ -903,7 +903,7 @@ copy_heap_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
  *
  */
 static void
-finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids, List *new_index_oids,
+tsl_finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids, List *new_index_oids,
 				  bool swap_toast_by_content, bool is_internal, TransactionId frozenXid,
 				  MultiXactId cutoffMulti, Oid wait_id)
 {
@@ -973,7 +973,7 @@ finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids, List *ne
 	 * Swap the contents of the heap relations (including any toast tables).
 	 * Also set old heap's relfrozenxid to frozenXid.
 	 */
-	swap_relation_files(OIDOldHeap,
+	tsl_swap_relation_files(OIDOldHeap,
 						OIDNewHeap,
 						swap_toast_by_content,
 						is_internal,
@@ -987,7 +987,7 @@ finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids, List *ne
 		Oid old_index_oid = lfirst_oid(old_index_cell);
 		Oid new_index_oid = lfirst_oid(new_index_cell);
 
-		swap_relation_files(old_index_oid,
+		tsl_swap_relation_files(old_index_oid,
 							new_index_oid,
 							swap_toast_by_content,
 							true,
@@ -1067,7 +1067,7 @@ finish_heap_swaps(Oid OIDOldHeap, Oid OIDNewHeap, List *old_index_oids, List *ne
  *
  */
 static void
-swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal,
+tsl_swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal,
 					TransactionId frozenXid, MultiXactId cutoffMulti)
 {
 	Relation relRelation;
@@ -1184,7 +1184,7 @@ swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal
 			if (relform1->reltoastrelid && relform2->reltoastrelid)
 			{
 				/* Recursively swap the contents of the toast tables */
-				swap_relation_files(relform1->reltoastrelid,
+				tsl_swap_relation_files(relform1->reltoastrelid,
 									relform2->reltoastrelid,
 									swap_toast_by_content,
 									is_internal,
@@ -1271,7 +1271,7 @@ swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal
 		toastIndex1 = toast_get_valid_index(r1, AccessExclusiveLock);
 		toastIndex2 = toast_get_valid_index(r2, AccessExclusiveLock);
 
-		swap_relation_files(toastIndex1,
+		tsl_swap_relation_files(toastIndex1,
 							toastIndex2,
 							swap_toast_by_content,
 							is_internal,
@@ -1322,7 +1322,7 @@ swap_relation_files(Oid r1, Oid r2, bool swap_toast_by_content, bool is_internal
  * So, we must reconstruct the tuple from component Datums.
  */
 static void
-reform_and_rewrite_tuple(HeapTuple tuple, TupleDesc oldTupDesc, TupleDesc newTupDesc, Datum *values,
+tsl_reform_and_rewrite_tuple(HeapTuple tuple, TupleDesc oldTupDesc, TupleDesc newTupDesc, Datum *values,
 						 bool *isnull, RewriteState rwstate)
 {
 	HeapTuple copiedTuple;

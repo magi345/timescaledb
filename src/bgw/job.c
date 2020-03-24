@@ -350,7 +350,8 @@ get_job_lock_for_delete(int32 job_id)
 		if (VirtualTransactionIdIsValid(*vxid))
 		{
 			proc = BackendIdGetProc(vxid->backendId);
-			if (proc != NULL && proc->isBackgroundWorker)
+			/* GP_TIMESCALEDB_FIXME: proc->isBackgroundWorker is not exists, needs backport PG */
+			//if (proc != NULL && proc->isBackgroundWorker)
 			{
 				elog(NOTICE,
 					 "cancelling the background worker for job %d (pid %d)",
@@ -795,7 +796,7 @@ bgw_job_tuple_update_by_id(TupleInfo *ti, void *const data)
 
 	ts_catalog_update(ti->scanrel, tuple);
 	heap_freetuple(tuple);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 static bool

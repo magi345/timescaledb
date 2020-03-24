@@ -289,8 +289,7 @@ ts_get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop, 
 	short typLen;
 	char typByVal;
 	unsigned int opfuncoid;
-	uintptr_t *values;
-	int nvalues;
+	AttStatsSlot sslot;
 	int i;
 
 	/*
@@ -336,37 +335,25 @@ ts_get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop, 
 	 * the one we want, fail --- this suggests that there is data we can't
 	 * use.
 	 */
-	if (get_attstatsslot(vardata->statsTuple,
-						 vardata->atttype,
-						 vardata->atttypmod,
+	if (get_attstatsslot(&sslot, vardata->statsTuple,
 						 STATISTIC_KIND_HISTOGRAM,
 						 sortop,
-						 NULL,
-						 &values,
-						 &nvalues,
-						 NULL,
-						 NULL))
+						 ATTSTATSSLOT_VALUES))
 	{
-		if (nvalues > 0)
+		if (sslot.nvalues > 0)
 		{
-			tmin = datumCopy(values[0], typByVal, typLen);
-			tmax = datumCopy(values[nvalues - 1], typByVal, typLen);
+			tmin = datumCopy(sslot.values[0], typByVal, typLen);
+			tmax = datumCopy(sslot.values[sslot.nvalues - 1], typByVal, typLen);
 			have_data = true;
 		}
-		free_attstatsslot(vardata->atttype, values, nvalues, NULL, 0);
+		free_attstatsslot(&sslot);
 	}
-	else if (get_attstatsslot(vardata->statsTuple,
-							  vardata->atttype,
-							  vardata->atttypmod,
+	else if (get_attstatsslot(&sslot, vardata->statsTuple,
 							  STATISTIC_KIND_HISTOGRAM,
 							  InvalidOid,
-							  NULL,
-							  &values,
-							  &nvalues,
-							  NULL,
-							  NULL))
+							  ATTSTATSSLOT_VALUES))
 	{
-		free_attstatsslot(vardata->atttype, values, nvalues, NULL, 0);
+		free_attstatsslot(&sslot);
 		return false;
 	}
 
@@ -376,16 +363,10 @@ ts_get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop, 
 	 * the MCVs.  However, usually the MCVs will not be the extreme values, so
 	 * avoid unnecessary data copying.
 	 */
-	if (get_attstatsslot(vardata->statsTuple,
-						 vardata->atttype,
-						 vardata->atttypmod,
+	if (get_attstatsslot(&sslot, vardata->statsTuple,
 						 STATISTIC_KIND_MCV,
 						 InvalidOid,
-						 NULL,
-						 &values,
-						 &nvalues,
-						 NULL,
-						 NULL))
+						 ATTSTATSSLOT_VALUES))
 	{
 		char tmin_is_mcv = false;
 		char tmax_is_mcv = false;
@@ -393,22 +374,22 @@ ts_get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop, 
 
 		fmgr_info(opfuncoid, &opproc);
 
-		for (i = 0; i < nvalues; i++)
+		for (i = 0; i < sslot.nvalues; i++)
 		{
 			if (!have_data)
 			{
-				tmin = tmax = values[i];
+				tmin = tmax = sslot.values[i];
 				tmin_is_mcv = tmax_is_mcv = have_data = true;
 				continue;
 			}
-			if (DatumGetBool(FunctionCall2Coll(&opproc, DEFAULT_COLLATION_OID, values[i], tmin)))
+			if (DatumGetBool(FunctionCall2Coll(&opproc, DEFAULT_COLLATION_OID, sslot.values[i], tmin)))
 			{
-				tmin = values[i];
+				tmin = sslot.values[i];
 				tmin_is_mcv = true;
 			}
-			if (DatumGetBool(FunctionCall2Coll(&opproc, DEFAULT_COLLATION_OID, tmax, values[i])))
+			if (DatumGetBool(FunctionCall2Coll(&opproc, DEFAULT_COLLATION_OID, tmax, sslot.values[i])))
 			{
-				tmax = values[i];
+				tmax = sslot.values[i];
 				tmax_is_mcv = true;
 			}
 		}
@@ -416,7 +397,7 @@ ts_get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop, 
 			tmin = datumCopy(tmin, typByVal, typLen);
 		if (tmax_is_mcv)
 			tmax = datumCopy(tmax, typByVal, typLen);
-		free_attstatsslot(vardata->atttype, values, nvalues, NULL, 0);
+		free_attstatsslot(&sslot);
 	}
 
 	*min = tmin;

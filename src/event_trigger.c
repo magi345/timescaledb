@@ -55,7 +55,7 @@ ts_event_trigger_ddl_commands(void)
 
 	while (tuplestore_gettupleslot(rsinfo.setResult, true, false, slot))
 	{
-		HeapTuple tuple = ExecFetchSlotTuple(slot);
+		HeapTuple tuple = ExecFetchSlotHeapTuple(slot);
 		CollectedCommand *cmd;
 		Datum values[DDL_INFO_NATTS];
 		bool nulls[DDL_INFO_NATTS];
@@ -202,7 +202,7 @@ ts_event_trigger_dropped_objects(void)
 
 	while (tuplestore_gettupleslot(rsinfo.setResult, true, false, slot))
 	{
-		HeapTuple tuple = ExecFetchSlotTuple(slot);
+		HeapTuple tuple = ExecFetchSlotHeapTuple(slot);
 		Datum values[DROPPED_OBJECTS_NATTS];
 		bool nulls[DROPPED_OBJECTS_NATTS];
 		Oid class_id;

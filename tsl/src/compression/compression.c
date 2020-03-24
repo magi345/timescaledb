@@ -327,7 +327,7 @@ compress_chunk_sort_relation(Relation in_rel, int n_keys, const ColumnCompressio
 													 &sort_collations[n],
 													 &nulls_first[n]);
 
-	tuplesortstate = tuplesort_begin_heap(tupDesc,
+	tuplesortstate = tuplesort_begin_heap(NULL, tupDesc,
 										  n_keys,
 										  sort_keys,
 										  sort_operators,
@@ -348,7 +348,7 @@ compress_chunk_sort_relation(Relation in_rel, int n_keys, const ColumnCompressio
 			// TODO is this the most efficient way to do this?
 			//     (since we use begin_heap() the tuplestore expects tupleslots,
 			//      so ISTM that the options are this or maybe putdatum())
-			ExecStoreTuple(tuple, heap_tuple_slot, InvalidBuffer, false);
+			ExecStoreHeapTuple(tuple, heap_tuple_slot, InvalidBuffer, false);
 			tuplesort_puttupleslot(tuplesortstate, heap_tuple_slot);
 		}
 	}
@@ -594,7 +594,7 @@ row_compressor_update_group(RowCompressor *row_compressor, TupleTableSlot *row)
 	int col;
 
 	Assert(row_compressor->rows_compressed_into_current_value == 0);
-	Assert(row_compressor->n_input_columns <= row->tts_nvalid);
+	Assert(row_compressor->n_input_columns <= row->PRIVATE_tts_nvalid);
 
 	for (col = 0; col < row_compressor->n_input_columns; col++)
 	{
@@ -760,7 +760,8 @@ row_compressor_flush(RowCompressor *row_compressor, CommandId mycid, bool change
 				compressed_tuple,
 				mycid,
 				0 /*=options*/,
-				row_compressor->bistate);
+				row_compressor->bistate,
+				GetCurrentTransactionId());
 
 	/* free the compressed values now that we're done with them (the old compressor is freed in
 	 * finish()) */
@@ -1150,7 +1151,8 @@ row_decompressor_decompress_row(RowDecompressor *row_decompressor)
 						decompressed_tuple,
 						row_decompressor->mycid,
 						0 /*=options*/,
-						row_decompressor->bistate);
+						row_decompressor->bistate,
+						GetCurrentTransactionId());
 
 			heap_freetuple(decompressed_tuple);
 			wrote_data = true;

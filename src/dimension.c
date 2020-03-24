@@ -400,7 +400,7 @@ dimension_find_hypertable_id_tuple_found(TupleInfo *ti, void *data)
 
 	*hypertable_id = heap_getattr(ti->tuple, Anum_dimension_hypertable_id, ti->desc, &isnull);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 int32
@@ -558,7 +558,7 @@ dimension_tuple_update(TupleInfo *ti, void *data)
 	ts_catalog_update_tid(ti->scanrel, &ti->tuple->t_self, tuple);
 	ts_catalog_restore_user(&sec_ctx);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 static int32

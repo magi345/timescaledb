@@ -259,7 +259,7 @@ hypertable_tuple_get_relid(TupleInfo *ti, void *data)
 	if (OidIsValid(schema_oid))
 		*relid = get_relname_relid(NameStr(fd.table_name), schema_oid);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 Oid
@@ -477,7 +477,7 @@ hypertable_tuple_update(TupleInfo *ti, void *data)
 	ts_catalog_update_tid(ti->scanrel, &ti->tuple->t_self, new_tuple);
 	ts_catalog_restore_user(&sec_ctx);
 	heap_freetuple(new_tuple);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 int
@@ -753,7 +753,7 @@ tuple_found_lock(TupleInfo *ti, void *data)
 	HTSU_Result *result = data;
 
 	*result = ti->lockresult;
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 HTSU_Result
@@ -921,7 +921,7 @@ hypertable_tuple_found(TupleInfo *ti, void *data)
 	Hypertable **entry = data;
 
 	*entry = ts_hypertable_from_tupleinfo(ti);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 Hypertable *

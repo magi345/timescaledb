@@ -115,7 +115,7 @@ gapfill_fetch_sample(GapFillState *state, GapFillInterpolateColumnState *column,
 	/* Build a temporary HeapTuple control structure */
 	tuple.t_len = HeapTupleHeaderGetDatumLength(th);
 	ItemPointerSetInvalid(&(tuple.t_self));
-	tuple.t_tableOid = InvalidOid;
+	//tuple.t_tableOid = InvalidOid;
 	tuple.t_data = th;
 
 	/* check first element in record matches timestamp datatype */

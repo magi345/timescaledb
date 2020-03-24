@@ -291,7 +291,7 @@ timescaledb_CopyFrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht)
 
 		/* Place tuple in tuple slot --- but slot shouldn't free it */
 		slot = myslot;
-		ExecStoreTuple(tuple, slot, InvalidBuffer, false);
+		ExecStoreHeapTuple(tuple, slot, InvalidBuffer, false);
 
 		/* Convert the tuple to match the chunk's rowtype */
 		tuple = ts_chunk_insert_state_convert_tuple(cis, tuple, &slot);
@@ -309,7 +309,7 @@ timescaledb_CopyFrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht)
 		 * Constraints might reference the tableoid column, so initialize
 		 * t_tableOid before evaluating them.
 		 */
-		tuple->t_tableOid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+		//tuple->t_tableOid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
 
 		skip_tuple = false;
 
@@ -334,7 +334,7 @@ timescaledb_CopyFrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht)
 				List *recheckIndexes = NIL;
 
 				/* OK, store the tuple and create index entries for it */
-				heap_insert(resultRelInfo->ri_RelationDesc, tuple, mycid, hi_options, bistate);
+				heap_insert(resultRelInfo->ri_RelationDesc, tuple, mycid, hi_options, bistate, GetCurrentTransactionId());
 
 				if (resultRelInfo->ri_NumIndices > 0)
 					recheckIndexes =
@@ -594,7 +594,7 @@ timescaledb_DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *proces
 	copy_security_check(rel, attnums);
 
 #if PG96
-	cstate = BeginCopyFrom(rel, stmt->filename, stmt->is_program, stmt->attlist, stmt->options);
+	cstate = BeginCopyFrom(rel, stmt->filename, stmt->is_program, NULL, NULL, stmt->attlist, stmt->options);
 #else
 	{
 		ParseState *pstate = make_parsestate(NULL);

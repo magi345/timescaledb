@@ -469,7 +469,7 @@ dimension_slice_fill(TupleInfo *ti, void *data)
 	DimensionSlice **slice = data;
 
 	memcpy(&(*slice)->fd, GETSTRUCT(ti->tuple), sizeof(FormData_dimension_slice));
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 /*
@@ -517,7 +517,7 @@ dimension_slice_tuple_found(TupleInfo *ti, void *data)
 
 	*slice = dimension_slice_from_tuple(ti->tuple);
 	MemoryContextSwitchTo(old);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 DimensionSlice *
@@ -749,7 +749,7 @@ dimension_slice_check_chunk_stats_tuple_found(TupleInfo *ti, void *data)
 		{
 			/* Save the chunk_id */
 			info->chunk_id = lfirst_int(lc);
-			return SCAN_DONE;
+			return TS_SCAN_DONE;
 		}
 	}
 
@@ -795,7 +795,7 @@ dimension_slice_check_is_chunk_uncompressed_tuple_found(TupleInfo *ti, void *dat
 		{
 			/* found a chunk that has not yet been compressed */
 			*((int32 *) data) = chunk_id;
-			return SCAN_DONE;
+			return TS_SCAN_DONE;
 		}
 	}
 

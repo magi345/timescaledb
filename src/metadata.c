@@ -80,7 +80,7 @@ metadata_tuple_get_value(TupleInfo *ti, void *data)
 	if (!dv->isnull)
 		dv->value = convert_text_to_type(dv->value, dv->typeid);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 static Datum

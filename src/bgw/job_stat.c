@@ -149,7 +149,7 @@ bgw_job_stat_tuple_mark_start(TupleInfo *ti, void *const data)
 	ts_catalog_update(ti->scanrel, tuple);
 	heap_freetuple(tuple);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 typedef struct
@@ -278,7 +278,7 @@ bgw_job_stat_tuple_mark_end(TupleInfo *ti, void *const data)
 	ts_catalog_update(ti->scanrel, tuple);
 	heap_freetuple(tuple);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 static ScanTupleResult
@@ -293,7 +293,7 @@ bgw_job_stat_tuple_set_next_start(TupleInfo *ti, void *const data)
 	ts_catalog_update(ti->scanrel, tuple);
 	heap_freetuple(tuple);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 static bool

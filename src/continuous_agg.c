@@ -33,11 +33,12 @@
 
 #define CHECK_NAME_MATCH(name1, name2) (namestrcmp(name1, name2) == 0)
 
+
 static const WithClauseDefinition continuous_aggregate_with_clause_def[] = {
 		[ContinuousEnabled] = {
 			.arg_name = "continuous",
 			.type_id = BOOLOID,
-			.default_val = BoolGetDatum(false),
+			.default_val = (Datum) 0,
 		},
 		[ContinuousViewOptionRefreshInterval] = {
 			.arg_name = "refresh_interval",
@@ -54,7 +55,7 @@ static const WithClauseDefinition continuous_aggregate_with_clause_def[] = {
 		[ContinuousViewOptionCreateGroupIndex] = {
 			.arg_name = "create_group_indexes",
 			.type_id = BOOLOID,
-			.default_val = BoolGetDatum(true),
+			.default_val = (Datum) 1,
 		},
 		[ContinuousViewOptionIgnoreInvalidationOlderThan] = {
 			.arg_name = "ignore_invalidation_older_than",

@@ -104,10 +104,10 @@ ts_chunk_insert_state_convert_tuple(ChunkInsertState *state, HeapTuple tuple,
 		/* No conversion needed */
 		return tuple;
 
-	tuple = do_convert_tuple(tuple, state->tup_conv_map);
+	tuple = execute_attr_map_tuple(tuple, state->tup_conv_map);
 
 	ExecSetSlotDescriptor(state->slot, RelationGetDescr(chunkrel));
-	ExecStoreTuple(tuple, state->slot, InvalidBuffer, true);
+	ExecStoreHeapTuple(tuple, state->slot, InvalidBuffer, true);
 
 	if (NULL != existing_slot)
 		*existing_slot = state->slot;
@@ -390,8 +390,8 @@ adjust_projections(ChunkInsertState *cis, ChunkDispatch *dispatch, Oid rowtype)
 	 * correctly in mapping hypertable attnos->chunk attnos
 	 */
 	variable_attnos_map = convert_tuples_by_name_map(chunk_desc,
-													 hypertable_desc,
-													 gettext_noop("could not convert row type"));
+													 hypertable_desc);
+													 //gettext_noop("could not convert row type"));
 	variable_attnos_map_size = hypertable_desc->natts;
 
 	if (rri->ri_projectReturning != NULL)
@@ -554,8 +554,8 @@ ts_chunk_insert_state_create(Chunk *chunk, ChunkDispatch *dispatch)
 	if (tuple_conversion_needed(RelationGetDescr(parent_rel), RelationGetDescr(rel)))
 	{
 		state->tup_conv_map = convert_tuples_by_name(RelationGetDescr(parent_rel),
-													 RelationGetDescr(rel),
-													 gettext_noop("could not convert row type"));
+													 RelationGetDescr(rel));
+													 //gettext_noop("could not convert row type"));
 		adjust_projections(state, dispatch, RelationGetForm(rel)->reltype);
 	}
 

@@ -468,7 +468,7 @@ mattablecolumninfo_create_materialization_table(MatTableColumnInfo *matcolinfo, 
 	toast_options =
 		transformRelOptions((Datum) 0, create->options, "toast", validnsps, true, false);
 	(void) heap_reloptions(RELKIND_TOASTVALUE, toast_options, true);
-	NewRelationCreateToastTable(mat_relid, toast_options);
+	NewRelationCreateToastTable(mat_relid, toast_options, false, false);
 	RESTORE_USER(uid, saved_uid, sec_ctx);
 
 	/*convert the mat. table to a hypertable */

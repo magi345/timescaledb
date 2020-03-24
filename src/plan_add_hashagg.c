@@ -81,10 +81,12 @@ plan_add_parallel_hashagg(PlannerInfo *root, RelOptInfo *input_rel, RelOptInfo *
 											  partial_grouping_target,
 											  AGG_HASHED,
 											  AGGSPLIT_INITIAL_SERIAL,
+											  false, /* streaming */
 											  parse->groupClause,
 											  NIL,
 											  &agg_partial_costs,
-											  d_num_partial_groups));
+											  d_num_partial_groups,
+											  NULL));
 
 	if (!output_rel->partial_pathlist)
 		return;
@@ -106,10 +108,12 @@ plan_add_parallel_hashagg(PlannerInfo *root, RelOptInfo *input_rel, RelOptInfo *
 									  target,
 									  AGG_HASHED,
 									  AGGSPLIT_FINAL_DESERIAL,
+									  false, /* streaming */
 									  parse->groupClause,
 									  (List *) parse->havingQual,
 									  &agg_final_costs,
-									  d_num_groups));
+									  d_num_groups,
+									  NULL)); // ?? &hash_info ??
 }
 
 /* This function add a HashAggregate path, if appropriate
@@ -186,8 +190,10 @@ ts_plan_add_hashagg(PlannerInfo *root, RelOptInfo *input_rel, RelOptInfo *output
 									  target,
 									  AGG_HASHED,
 									  AGGSPLIT_SIMPLE,
+									  false, /* streaming */
 									  parse->groupClause,
 									  (List *) parse->havingQual,
 									  &agg_costs,
-									  d_num_groups));
+									  d_num_groups,
+									  NULL)); //?? &hash_info ??
 }

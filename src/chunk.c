@@ -560,7 +560,7 @@ create_toast_table(CreateStmt *stmt, Oid chunk_oid)
 
 	(void) heap_reloptions(RELKIND_TOASTVALUE, toast_options, true);
 
-	NewRelationCreateToastTable(chunk_oid, toast_options);
+	NewRelationCreateToastTable(chunk_oid, toast_options, false, false);
 }
 
 /*
@@ -624,6 +624,8 @@ ts_chunk_create_table(Chunk *chunk, Hypertable *ht, char *tablespacename)
 							 ,
 							 NULL
 #endif
+							 ,
+							 'h', false, true, NULL
 	);
 
 	/*
@@ -812,7 +814,7 @@ chunk_tuple_found(TupleInfo *ti, void *arg)
 	Chunk *chunk = arg;
 
 	chunk_fill(chunk, ti->tuple, ti->desc);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 /* Fill in a chunk stub. The stub data structure needs the stub ID and constraints set.
@@ -2067,7 +2069,7 @@ chunk_tuple_update_schema_and_table(TupleInfo *ti, void *data)
 	ts_catalog_update_tid(ti->scanrel, &ti->tuple->t_self, new_tuple);
 	ts_catalog_restore_user(&sec_ctx);
 	heap_freetuple(new_tuple);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 static bool
@@ -2121,7 +2123,7 @@ chunk_set_compressed_id_in_tuple(TupleInfo *ti, void *data)
 	ts_catalog_restore_user(&sec_ctx);
 	heap_freetuple(new_tuple);
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 /*Assume permissions are already checked */

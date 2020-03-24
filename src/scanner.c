@@ -253,7 +253,7 @@ ts_scanner_scan(ScannerCtx *ctx)
 	for (ts_scanner_start_scan(ctx, &ictx); (tinfo = ts_scanner_next(ctx, &ictx));)
 	{
 		/* Call tuple_found handler. Abort the scan if the handler wants us to */
-		if (ctx->tuple_found != NULL && ctx->tuple_found(tinfo, ctx->data) == SCAN_DONE)
+		if (ctx->tuple_found != NULL && ctx->tuple_found(tinfo, ctx->data) == TS_SCAN_DONE)
 		{
 			ts_scanner_end_scan(ctx, &ictx);
 			break;

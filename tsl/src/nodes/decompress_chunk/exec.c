@@ -336,14 +336,29 @@ decompress_chunk_exec(CustomScanState *node)
 		return NULL;
 
 #if PG96
-	if (node->ss.ps.ps_TupFromTlist)
+	if (IsA(node->ss.ps.plan, AggState))
 	{
-		resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+		if (((AggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
 
-		if (isDone == ExprMultipleResult)
-			return resultslot;
+			if (isDone == ExprMultipleResult)
+				return resultslot;
 
-		node->ss.ps.ps_TupFromTlist = false;
+			((AggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
+	}
+	else if (IsA(node->ss.ps.plan, WindowAggState))
+	{
+		if (((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+
+			if (isDone == ExprMultipleResult)
+				return resultslot;
+
+			((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
 	}
 #endif
 
@@ -377,7 +392,11 @@ decompress_chunk_exec(CustomScanState *node)
 
 		if (isDone != ExprEndResult)
 		{
-			node->ss.ps.ps_TupFromTlist = (isDone == ExprMultipleResult);
+			if (IsA(node->ss.ps.plan, AggState))
+				((AggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+			else if (IsA(node->ss.ps.plan, WindowAggState))
+				((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+
 			return resultslot;
 		}
 #else
@@ -465,11 +484,11 @@ decompress_chunk_create_tuple(DecompressChunkState *state)
 							elog(ERROR, "compressed column out of sync with batch counter");
 						}
 
-						slot->tts_values[attr] = result.val;
-						slot->tts_isnull[attr] = result.is_null;
+						slot->PRIVATE_tts_values[attr] = result.val;
+						slot->PRIVATE_tts_isnull[attr] = result.is_null;
 					}
 					else
-						slot->tts_isnull[attr] = true;
+						slot->PRIVATE_tts_isnull[attr] = true;
 
 					break;
 				}
@@ -477,8 +496,8 @@ decompress_chunk_create_tuple(DecompressChunkState *state)
 				{
 					AttrNumber attr = AttrNumberGetAttrOffset(column->attno);
 
-					slot->tts_values[attr] = column->segmentby.value;
-					slot->tts_isnull[attr] = column->segmentby.isnull;
+					slot->PRIVATE_tts_values[attr] = column->segmentby.value;
+					slot->PRIVATE_tts_isnull[attr] = column->segmentby.isnull;
 					break;
 				}
 				case SEQUENCE_NUM_COLUMN:

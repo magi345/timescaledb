@@ -68,7 +68,7 @@ chunk_dispatch_exec(CustomScanState *node)
 		/* Switch to the executor's per-tuple memory context */
 		old = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
 
-		tuple = ExecFetchSlotTuple(slot);
+		tuple = ExecFetchSlotHeapTuple(slot);
 
 		/* Calculate the tuple's point in the N-dimensional hyperspace */
 		point = ts_hyperspace_calculate_point(ht->space, tuple, tupdesc);

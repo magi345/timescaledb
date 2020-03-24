@@ -214,7 +214,7 @@ is_const_null(Expr *expr)
  * throws an error if no cast can be found
  */
 static Oid
-get_cast_func(Oid source, Oid target)
+tsl_get_cast_func(Oid source, Oid target)
 {
 	Oid result = InvalidOid;
 	HeapTuple casttup;
@@ -346,7 +346,7 @@ get_boundary_expr_value(GapFillState *state, GapFillBoundary boundary, Expr *exp
 	 */
 	if (exprType((Node *) expr) != state->gapfill_typid)
 	{
-		Oid cast_oid = get_cast_func(exprType((Node *) expr), state->gapfill_typid);
+		Oid cast_oid = tsl_get_cast_func(exprType((Node *) expr), state->gapfill_typid);
 
 		expr = (Expr *) makeFuncExpr(cast_oid,
 									 state->gapfill_typid,
@@ -722,7 +722,7 @@ static void
 gapfill_rescan(CustomScanState *node)
 {
 #if PG96
-	node->ss.ps.ps_TupFromTlist = false;
+	//node->ss.ps.ps_TupFromTlist = false;
 #endif
 	if (node->custom_ps != NIL)
 	{
@@ -786,16 +786,16 @@ gapfill_state_gaptuple_create(GapFillState *state, int64 time)
 		switch (column.base->ctype)
 		{
 			case TIME_COLUMN:
-				slot->tts_values[i] = gapfill_internal_get_datum(time, state->gapfill_typid);
-				slot->tts_isnull[i] = false;
+				slot->PRIVATE_tts_values[i] = gapfill_internal_get_datum(time, state->gapfill_typid);
+				slot->PRIVATE_tts_isnull[i] = false;
 				break;
 			case GROUP_COLUMN:
 			case DERIVED_COLUMN:
-				slot->tts_values[i] = column.group->value;
-				slot->tts_isnull[i] = column.group->isnull;
+				slot->PRIVATE_tts_values[i] = column.group->value;
+				slot->PRIVATE_tts_isnull[i] = column.group->isnull;
 				break;
 			case NULL_COLUMN:
-				slot->tts_isnull[i] = true;
+				slot->PRIVATE_tts_isnull[i] = true;
 				break;
 			default:
 				break;
@@ -816,15 +816,15 @@ gapfill_state_gaptuple_create(GapFillState *state, int64 time)
 				gapfill_locf_calculate(column.locf,
 									   state,
 									   time,
-									   &slot->tts_values[i],
-									   &slot->tts_isnull[i]);
+									   &slot->PRIVATE_tts_values[i],
+									   &slot->PRIVATE_tts_isnull[i]);
 				break;
 			case INTERPOLATE_COLUMN:
 				gapfill_interpolate_calculate(column.interpolate,
 											  state,
 											  time,
-											  &slot->tts_values[i],
-											  &slot->tts_isnull[i]);
+											  &slot->PRIVATE_tts_values[i],
+											  &slot->PRIVATE_tts_isnull[i]);
 				break;
 			default:
 				break;
@@ -901,9 +901,9 @@ gapfill_state_return_subplan_slot(GapFillState *state)
 					gapfill_locf_calculate(column.locf,
 										   state,
 										   state->subslot_time,
-										   &state->subslot->tts_values[i],
-										   &state->subslot->tts_isnull[i]);
-					modified = !state->subslot->tts_isnull[i];
+										   &state->subslot->PRIVATE_tts_values[i],
+										   &state->subslot->PRIVATE_tts_isnull[i]);
+					modified = !state->subslot->PRIVATE_tts_isnull[i];
 				}
 				else
 					gapfill_locf_tuple_returned(column.locf, value, isnull);
@@ -926,19 +926,21 @@ gapfill_state_return_subplan_slot(GapFillState *state)
 	 */
 	if (modified)
 	{
-		if (state->subslot->tts_shouldFree)
+		if (TupShouldFree(state->subslot))
 		{
-			heap_freetuple(state->subslot->tts_tuple);
-			state->subslot->tts_shouldFree = false;
+			heap_freetuple(state->subslot->PRIVATE_tts_heaptuple);
+			TupClearShouldFree(state->subslot);
 		}
-		state->subslot->tts_tuple = NULL;
+		state->subslot->PRIVATE_tts_heaptuple = NULL;
 
+		/* GP_TIMESCALEDB_FIXME: no such fields
 		if (state->subslot->tts_shouldFreeMin)
 		{
 			heap_free_minimal_tuple(state->subslot->tts_mintuple);
 			state->subslot->tts_shouldFreeMin = false;
 		}
 		state->subslot->tts_mintuple = NULL;
+		 */
 	}
 
 	return state->subslot;
@@ -1009,14 +1011,29 @@ fetch_subplan_tuple(CustomScanState *node)
 #endif
 
 #if PG96
-	if (node->ss.ps.ps_TupFromTlist)
+	if (IsA(node->ss.ps.plan, AggState))
 	{
-		resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+		if (((AggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
 
-		if (isDone == ExprMultipleResult)
-			return resultslot;
+			if (isDone == ExprMultipleResult)
+				return resultslot;
 
-		node->ss.ps.ps_TupFromTlist = false;
+			((AggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
+	}
+	else if (IsA(node->ss.ps.plan, WindowAggState))
+	{
+		if (((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+
+			if (isDone == ExprMultipleResult)
+				return resultslot;
+
+			((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
 	}
 #endif
 
@@ -1039,7 +1056,11 @@ fetch_subplan_tuple(CustomScanState *node)
 
 		if (isDone != ExprEndResult)
 		{
-			node->ss.ps.ps_TupFromTlist = (isDone == ExprMultipleResult);
+			if (IsA(node->ss.ps.plan, AggState))
+				((AggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+			else if (IsA(node->ss.ps.plan, WindowAggState))
+				((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+
 			return resultslot;
 		}
 #else

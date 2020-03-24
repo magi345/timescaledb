@@ -41,7 +41,7 @@ typedef struct TupleInfo
 
 typedef enum ScanTupleResult
 {
-	SCAN_DONE,
+	TS_SCAN_DONE,
 	SCAN_CONTINUE
 } ScanTupleResult;
 

@@ -261,14 +261,29 @@ ca_append_exec(CustomScanState *node)
 		return NULL;
 
 #if PG96
-	if (node->ss.ps.ps_TupFromTlist)
+	if (IsA(node->ss.ps.plan, AggState))
 	{
-		resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+		if (((AggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
 
-		if (isDone == ExprMultipleResult)
-			return resultslot;
+			if (isDone == ExprMultipleResult)
+				return resultslot;
 
-		node->ss.ps.ps_TupFromTlist = false;
+			((AggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
+	}
+	else if (IsA(node->ss.ps.plan, WindowAggState))
+	{
+		if (((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist)
+		{
+			resultslot = ExecProject(node->ss.ps.ps_ProjInfo, &isDone);
+
+			if (isDone == ExprMultipleResult)
+				return resultslot;
+
+			((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+		}
 	}
 #endif
 
@@ -291,7 +306,11 @@ ca_append_exec(CustomScanState *node)
 
 		if (isDone != ExprEndResult)
 		{
-			node->ss.ps.ps_TupFromTlist = (isDone == ExprMultipleResult);
+			if (IsA(node->ss.ps.plan, AggState))
+				((AggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+			else if (IsA(node->ss.ps.plan, WindowAggState))
+				((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = (isDone == ExprMultipleResult);
+
 			return resultslot;
 		}
 #else
@@ -313,7 +332,10 @@ static void
 ca_append_rescan(CustomScanState *node)
 {
 #if PG96
-	node->ss.ps.ps_TupFromTlist = false;
+	if (IsA(node->ss.ps.plan, AggState))
+		((AggState *)&(node->ss.ps))->ps_TupFromTlist = false;
+	else if (IsA(node->ss.ps.plan, WindowAggState))
+		((WindowAggState *)&(node->ss.ps))->ps_TupFromTlist = false;
 #endif
 	if (node->custom_ps != NIL)
 	{

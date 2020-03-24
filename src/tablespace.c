@@ -327,7 +327,7 @@ tablespace_tuple_delete(TupleInfo *ti, void *data)
 	ts_catalog_delete_only(ti->scanrel, ti->tuple);
 	ts_catalog_restore_user(&sec_ctx);
 
-	return (info->stopcount == 0 || ti->count < info->stopcount) ? SCAN_CONTINUE : SCAN_DONE;
+	return (info->stopcount == 0 || ti->count < info->stopcount) ? SCAN_CONTINUE : TS_SCAN_DONE;
 }
 
 int

@@ -721,7 +721,7 @@ chunk_index_tuple_found(TupleInfo *ti, void *const data)
 	ChunkIndexMapping *const cim = data;
 
 	chunk_index_mapping_from_tuple(ti, cim);
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 bool
@@ -837,7 +837,7 @@ chunk_index_tuple_rename(TupleInfo *ti, void *data)
 	if (info->isparent)
 		return SCAN_CONTINUE;
 
-	return SCAN_DONE;
+	return TS_SCAN_DONE;
 }
 
 int

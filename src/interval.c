@@ -55,7 +55,7 @@ ts_interval_from_tuple(Datum interval)
 
 	tuple.t_len = HeapTupleHeaderGetDatumLength(th);
 	ItemPointerSetInvalid(&(tuple.t_self));
-	tuple.t_tableOid = InvalidOid;
+	//tuple.t_tableOid = InvalidOid;
 	tuple.t_data = th;
 
 	heap_deform_tuple(&tuple, rowdesc, values, isnull);

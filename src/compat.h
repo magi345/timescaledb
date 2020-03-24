@@ -17,7 +17,7 @@
 #include "export.h"
 #include "planner_import.h"
 
-#define is_supported_pg_version_96(version) ((version >= 90603) && (version < 100000))
+#define is_supported_pg_version_96(version) ((version >= 90600) && (version < 100000))
 #define is_supported_pg_version_10(version) ((version >= 100002) && (version < 110000))
 #define is_supported_pg_version_11(version) ((version >= 110000) && (version < 120000))
 #define is_supported_pg_version(version)                                                           \
@@ -214,7 +214,7 @@
 
 #if PG96
 #define DefineRelationCompat(stmt, relkind, ownerid, typaddress, queryString)                      \
-	DefineRelation(stmt, relkind, ownerid, typaddress)
+	DefineRelation(stmt, relkind, ownerid, typaddress, RELSTORAGE_HEAP, false, true, NULL)
 #else
 #define DefineRelationCompat(stmt, relkind, ownerid, typaddress, queryString)                      \
 	DefineRelation(stmt, relkind, ownerid, typaddress, queryString)
@@ -387,6 +387,8 @@ get_attname_compat(Oid relid, AttrNumber attnum, bool missing_ok)
 	index_create(heapRelation,                                                                     \
 				 indexRelationName,                                                                \
 				 indexRelationId,                                                                  \
+				 InvalidOid,                                                                      \
+				 InvalidOid,                                                                      \
 				 relFileNode,                                                                      \
 				 indexInfo,                                                                        \
 				 indexColNames,                                                                    \
@@ -404,7 +406,7 @@ get_attname_compat(Oid relid, AttrNumber attnum, bool missing_ok)
 				 ((flags & INDEX_CREATE_SKIP_BUILD) != 0),                                         \
 				 ((flags & INDEX_CREATE_CONCURRENT) != 0),                                         \
 				 is_internal,                                                                      \
-				 ((flags & INDEX_CREATE_IF_NOT_EXISTS) != 0))
+				 ((flags & INDEX_CREATE_IF_NOT_EXISTS) != 0), NULL)
 #else
 #define index_create_compat(heapRelation,                                                          \
 							indexRelationName,                                                     \
